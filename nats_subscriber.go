@@ -2,25 +2,26 @@ package messager
 
 import (
 	"context"
+	"time"
 
 	"github.com/nats-io/nats.go"
 )
 
 type NatsSubscriber struct {
-	nc         NatsConnection
-	service    string
-	topic      string
-	handler    EventHandler
-	dlqHandler DLQHandler
+	nc          NatsConnection
+	serviceName string
+	topic       string
+	handler     EventHandler
+	dlqHandler  DLQHandler
 }
 
 func NewNatsSubscriber(nc NatsConnectionCloser, service, topic string, handler EventHandler, dlq DLQHandler) *NatsSubscriber {
 	return &NatsSubscriber{
-		nc:         nc,
-		service:    service,
-		topic:      topic,
-		handler:    handler,
-		dlqHandler: dlq,
+		nc:          nc,
+		serviceName: service,
+		topic:       topic,
+		handler:     handler,
+		dlqHandler:  dlq,
 	}
 }
 
@@ -43,7 +44,11 @@ func (n NatsSubscriber) sendToDLQ(context context.Context, message *nats.Msg, er
 	}
 
 	dlqMessage := DeadLetterQueueMessage{
-		Subject: message.Subject,
+		Subject:           message.Subject,
+		Consumer:          n.serviceName,
+		FailedConsumeDate: time.Now().Format(time.RFC3339Nano),
+		Message:           message.Data,
+		CausedBy:          err.Error(),
 	}
 
 	n.dlqHandler.Publish(context, &dlqMessage)
